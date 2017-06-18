@@ -3,32 +3,35 @@
 #include <math.h>
 #include <stdbool.h>
 
-#define MAX_POINTS 1000
-#define MEMSIZE 5
+#define MEMSIZE 5   //size of memory when should use realloc
 
 struct Point;
 struct Board;
 struct PairPoints;
 
+
+struct Board* initialBoard();
+void destroyBoard(struct Board *);
 void addPointtoBorder(struct Board *, const struct Point);
 void fillBoard(struct Board *, char const *);
 void dbPrint(const struct Board * const);
-struct Board* initialBoard();
-void destroyBoard(struct Board *);
-
-double_t getDistance(const struct Point, const struct Point);
-struct PairPoints getCrossPoints(const struct Point, const struct Point,
-                                 const double_t, const size_t);
-
 struct Point getPoint(const struct Board *, const size_t);
 size_t getNumPoints(const struct Board *);
+
+double_t getDistance(const struct Point, const struct Point);
 struct Point getCrossPoint(const struct Point, const struct Point,
                            const double_t, const size_t);
+struct PairPoints getCrossPoints(const struct Point, const struct Point,
+                                 const double_t, const size_t);
 
 bool inRadius(const struct Point, const size_t, const struct Point);
 bool isCross(const struct Point, const struct Point, const size_t);
 bool isCrossd(const double_t, const size_t);
 
+void fillNukePoinst(const size_t radius, const struct Board *board, struct Board *nukePoints);
+
+void getCoordinates(const size_t radius, const struct Board *board, const struct Board *nukePoints,
+                    struct Point *finalcoordinates, size_t *points_in_area);
 
 struct Point{
     double x;
@@ -44,42 +47,51 @@ struct Board{
 };
 
 int main(int argc, char **argv) {
-    char const * fname = (argc > 1) ? argv[1] : "../coords.txt";
+
+    char const * fname = (argc > 1) ? argv[1] : "coords.txt";
     size_t radius = (argc > 2) ? (size_t)atoi(argv[2]) : 10;
 
     struct Board *board = initialBoard();
     fillBoard(board, fname);
 
-    size_t i = 0;
-    size_t j = 0;
-    size_t npoints = getNumPoints(board);
     struct Board *nukePoints = initialBoard();
+    fillNukePoinst(radius, board, nukePoints);
 
-    for (i = 0; i < npoints; ++i){
-        for(j = i; j < npoints; ++j){
-            struct Point p1 = getPoint(board, i);
-            struct Point p2 = getPoint(board, j);
-            double_t distance = getDistance(p1, p2);
-            if (isCrossd(distance, radius)){
-                if (radius + radius == distance){
-                    struct Point p = getCrossPoint(p1, p2, distance, radius);
-                    printf("Point1:( %.2f : %.2f )^( %.2f : %.2f ) = ( %.2f : %.2f )\n",
-                           p1.x, p1.y, p2.x, p2.y, p.x, p.y);
-                    addPointtoBorder(nukePoints, p);
-                }else{
-                    struct PairPoints p = getCrossPoints(p1, p2, distance, radius);
-                    printf("Point1:( %.2f : %.2f )^( %.2f : %.2f ) = ( %.2f : %.2f ) + ( %.2f : %.2f )\n",
-                           p1.x, p1.y, p2.x, p2.y, p.p1.x, p.p1.y, p.p2.x, p.p2.y);
-                    addPointtoBorder(nukePoints, p.p1);
-                    addPointtoBorder(nukePoints, p.p2);
-                }
-            }
+    struct Point finalPoint;
+    size_t numtargets;
+    getCoordinates(radius, board, nukePoints, &finalPoint, &numtargets);
+
+    printf("BestPoint: (%.2f : %.2f)\nDestroyed: %d\n", finalPoint.x,
+           finalPoint.y, numtargets);
+
+    destroyBoard(board);
+    destroyBoard(nukePoints);
+    return 0;
+}
+
+void getCoordinates(const size_t radius, const struct Board *board, const struct Board *nukePoints,
+                    struct Point *finalcoordinates, size_t *points_in_area) {
+
+    size_t npoints = getNumPoints(nukePoints);
+
+    if (npoints == 0){
+        if (getNumPoints(board) != 0){
+            *finalcoordinates = getPoint(board, 0);
+            *points_in_area = 1;
+            return;
+        }else{
+            printf("[i] Bad board\n");
+            finalcoordinates->x = 0;
+            finalcoordinates->y = 0;
+            *points_in_area = 0;
+            return;
         }
     }
-    size_t indx = 0;
-    size_t maxpoints = 0;
+    size_t indx= 0;
+    size_t maxpoints= 0;
+    size_t i;
+    size_t j;
 
-    npoints = getNumPoints(nukePoints);
     for (i = 0; i < npoints; ++i){
         struct Point point = getPoint(nukePoints, i);
         size_t pointscount = 0;
@@ -95,13 +107,36 @@ int main(int argc, char **argv) {
             maxpoints = pointscount;
         }
     }
-    printf("BestPoint: (%f : %f)\nDestroyed: %d\n", getPoint(nukePoints, indx).x,
-           getPoint(nukePoints, indx).y, maxpoints);
-    dbPrint(board);
-    destroyBoard(board);
-    destroyBoard(nukePoints);
-    return 0;
+    *points_in_area = maxpoints;
+    *finalcoordinates = getPoint(nukePoints, indx);
+    return;
 }
+
+void fillNukePoinst(const size_t radius, const struct Board *board, struct Board *nukePoints) {
+    size_t i = 0;
+    size_t j = 0;
+    size_t npoints = getNumPoints(board);
+    if (npoints == 0)
+        return;
+    for (i = 0; i < npoints; ++i){
+        for(j = i; j < npoints; ++j){
+            struct Point p1 = getPoint(board, i);
+            struct Point p2 = getPoint(board, j);
+            double_t distance = getDistance(p1, p2);
+            if (isCrossd(distance, radius)){
+                if ((radius + radius) == distance){
+                    struct Point p = getCrossPoint(p1, p2, distance, radius);
+                    addPointtoBorder(nukePoints, p);
+                }else{
+                    struct PairPoints p = getCrossPoints(p1, p2, distance, radius);
+                    addPointtoBorder(nukePoints, p.p1);
+                    addPointtoBorder(nukePoints, p.p2);
+                }
+            }
+        }
+    }
+}
+
 bool inRadius(const struct Point circlePoint, const size_t radius, const struct Point p){
     if (pow((p.x - circlePoint.x), 2) + pow((p.y - circlePoint.y), 2) <= pow(radius, 2)){
         return true;
@@ -137,7 +172,6 @@ void destroyBoard(struct Board *board){
 void addPointtoBorder(struct Board *board, const struct Point point){
     board->npoints += 1;
     if (board->npoints % MEMSIZE == 0){
-        printf("Calloc\n");
         board->ppoints = (struct Point*)realloc(board->ppoints, sizeof(struct Point) * (board->npoints + MEMSIZE));
     }
     board->ppoints[(board->npoints) - 1] = point;
@@ -147,7 +181,7 @@ void fillBoard(struct Board *board, char const *fname){
     FILE * fp = fopen(fname, "r");
 
     if (fp == NULL) {
-        printf("Cannot open file [ %s ]\n", fname);
+        printf("[i] Cannot open file [ %s ]\n", fname);
         return;
     }
     struct Point c;
@@ -215,5 +249,3 @@ struct PairPoints getCrossPoints(const struct Point p1, const struct Point p2,
     pp.p2 = p2_cross;
     return pp;
 }
-
-
