@@ -2,7 +2,11 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stdbool.h>
-
+//Algorithm:
+//  1.Parse *.txt
+//  2.Copy points to memory and realloc when need
+//  3.Find cross points (our point in cross points)
+//  4.Every cross point substitude to circle and find point whome include in max nums of circles
 #define MEMSIZE 5   //size of memory when should use realloc
 
 struct Point;
